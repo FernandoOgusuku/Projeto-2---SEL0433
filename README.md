@@ -142,7 +142,6 @@ void main() {
 }
 ```
 
-
 ### 4.2 Temporização (Timers) e Interrupções
 Na segunda fase, o sistema evoluiu de uma arquitetura de varredura contínua (polling) para uma abordagem orientada a eventos. O acionamento dos botões passou a ser tratado por interrupções externas de hardware (INT0 e INT1), configuradas para detectar a borda de subida de forma assíncrona. Em paralelo, o controle do tempo de aferição (longa e curta duração) foi delegado ao módulo Timer0, que atua decrementando a contagem de forma autônoma a cada estouro programado.
 
@@ -163,6 +162,17 @@ Este é o firmware final integrado desenvolvido para o projeto em linguagem C:
 
 ## 6 Guia de Simulação e Testes
 Para validar a solução de hardware e software apresentada, o circuito foi esquematizado e testado no SimulIDE. Os resultados da execução e a resposta do sistema aos comandos analógicos e digitais podem ser observados nas figuras abaixo.
+
+
+
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/c127f249-194e-43a6-9d30-02dfd5841d02" height="400">
+</p>
+
+<p align="center">
+  <em>Figura 1: Simulação do Checkpoint 1 no SimulIDE. O sistema inicializa o display LCD HD44780 no modo de 4 bits, exibindo a string estática "HelloWrld". O circuito de pull-down (10 kΩ) no pino RD0 garante a leitura precisa da borda de subida, refletindo a contagem tratada via debounce no display.</em>
+</p>
+
 
 ---
 
