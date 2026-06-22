@@ -72,12 +72,6 @@ Abaixo, detalhamos os principais blocos lógicos construídos na Entrega Final.
 ### 4.1 Interface Visual e Configuração de I/O
 O primeiro passo do projeto consistiu em estabelecer a interface de comunicação com o usuário. Para isso, os pinos do microcontrolador foram mapeados para operar o display LCD HD44780 no modo de 4 bits, economizando portas do PIC. Nesta etapa inicial, também foi concebida a lógica base para a configuração de entradas e saídas digitais.
 
-[INSERIR BLOCO DE CÓDIGO AQUI: Trecho inicial do código contendo o mapeamento sbit do LCD e o trecho da função main() contendo a inicialização Lcd_Init() e Lcd_Cmd()]
-
-
-### 4.2 Temporização (Timers) e Interrupções
-Na segunda fase, o sistema evoluiu de uma arquitetura de varredura contínua (polling) para uma abordagem orientada a eventos. O acionamento dos botões passou a ser tratado por interrupções externas de hardware (INT0 e INT1), configuradas para detectar a borda de subida de forma assíncrona. Em paralelo, o controle do tempo de aferição (longa e curta duração) foi delegado ao módulo Timer0, que atua decrementando a contagem de forma autônoma a cada estouro programado.
-
 ```c
 sbit LCD_RS at LATB4_bit;             // Pino RS do LCD conectado ao RB4
 sbit LCD_EN at LATB5_bit;             // Pino Enable do LCD conectado ao RB5
@@ -147,6 +141,11 @@ void main() {
     }
 }
 ```
+
+
+### 4.2 Temporização (Timers) e Interrupções
+Na segunda fase, o sistema evoluiu de uma arquitetura de varredura contínua (polling) para uma abordagem orientada a eventos. O acionamento dos botões passou a ser tratado por interrupções externas de hardware (INT0 e INT1), configuradas para detectar a borda de subida de forma assíncrona. Em paralelo, o controle do tempo de aferição (longa e curta duração) foi delegado ao módulo Timer0, que atua decrementando a contagem de forma autônoma a cada estouro programado.
+
 
 ### 4.3 Conversão A/D, Matemática e Histerese
 A integração final adicionou a leitura do sensor de temperatura. O compilador MikroC possui uma peculiaridade na função ADC_Init(), que sobrescreve a configuração de referência de tensão para os padrões do chip. Para contornar isso e assegurar que a leitura utilizasse o limite estrito de 1V no pino AN3, o registrador ADCON1 foi manipulado manualmente logo após a chamada da biblioteca. Por fim, o valor bruto foi convertido matematicamente sem o uso de variáveis de ponto flutuante, e o sistema de aquecimento (LED) foi programado com uma lógica de histerese (ligar < 60°C; desligar > 80°C) para evitar oscilações indesejadas no controle do forno.
