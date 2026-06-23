@@ -145,25 +145,518 @@ void main() {
 ### 4.2 Temporização (Timers) e Interrupções
 Na segunda fase, o sistema evoluiu de uma arquitetura de varredura contínua (polling) para uma abordagem orientada a eventos. O acionamento dos botões passou a ser tratado por interrupções externas de hardware (INT0 e INT1), configuradas para detectar a borda de subida de forma assíncrona. Em paralelo, o controle do tempo de aferição (longa e curta duração) foi delegado ao módulo Timer0, que atua decrementando a contagem de forma autônoma a cada estouro programado.
 
+```c
+sbit LCD_RS at LATB4_bit;
+sbit LCD_EN at LATB5_bit;
+sbit LCD_D4 at LATB0_bit;
+sbit LCD_D5 at LATB1_bit;
+sbit LCD_D6 at LATB2_bit;
+sbit LCD_D7 at LATB3_bit;
+
+sbit LCD_RS_Direction at TRISB4_bit;
+sbit LCD_EN_Direction at TRISB5_bit;
+sbit LCD_D4_Direction at TRISB0_bit;
+sbit LCD_D5_Direction at TRISB1_bit;
+sbit LCD_D6_Direction at TRISB2_bit;
+sbit LCD_D7_Direction at TRISB3_bit;
+
+#define TMR0H_PRELOAD 0xE1
+#define TMR0L_PRELOAD 0x7B
+
+#define TMR1H_PRELOAD 0x0B
+#define TMR1L_PRELOAD 0xDC
+
+unsigned char tempo_restante = 0;     // Valor atual da contagem regressiva
+unsigned char modo_contagem = 0;      // 0 = parado, 1 = longo, 2 = curto
+unsigned char contagem_ativa = 0;     // Indica se a contagem esta rodando
+unsigned char ticks_250ms = 0;        // Conta 4 interrupcoes de 250 ms para formar 1 s
+unsigned char atualiza_tela = 1;      // Flag para atualizar o LCD
+
+unsigned char flag_botao_longo = 0;   // Flag do botao RD0
+unsigned char flag_botao_curto = 0;   // Flag do botao RD1
+
+void Carrega_Timer0() {
+    TMR0H = TMR0H_PRELOAD;
+    TMR0L = TMR0L_PRELOAD;
+}
+
+void Carrega_Timer1() {
+    TMR1H = TMR1H_PRELOAD;
+    TMR1L = TMR1L_PRELOAD;
+}
+
+void interrupt() {
+
+    if (TMR0IF_bit == 1) {
+        TMR0IF_bit = 0;       // Limpa a flag de interrupcao do Timer0
+        Carrega_Timer0();     // Recarrega o Timer0
+
+        if ((modo_contagem == 1) && (contagem_ativa == 1)) {
+            if (tempo_restante > 0) {
+                tempo_restante--;     // Decrementa a contagem
+                atualiza_tela = 1;    // Sinaliza atualizacao do LCD
+            }
+
+            if (tempo_restante == 0) {
+                contagem_ativa = 0;   // Finaliza a contagem
+                TMR0IE_bit = 0;       // Desabilita interrupcao do Timer0
+                atualiza_tela = 1;
+            }
+        }
+    }
+
+    if (TMR1IF_bit == 1) {
+        TMR1IF_bit = 0;       // Limpa a flag de interrupcao do Timer1
+        Carrega_Timer1();     // Recarrega o Timer1
+
+        if ((modo_contagem == 2) && (contagem_ativa == 1)) {
+            ticks_250ms++;
+
+            if (ticks_250ms >= 4) {
+                ticks_250ms = 0;
+
+                if (tempo_restante > 0) {
+                    tempo_restante--;  // Decrementa a contagem
+                    atualiza_tela = 1;
+                }
+
+                if (tempo_restante == 0) {
+                    contagem_ativa = 0; // Finaliza a contagem
+                    TMR1IE_bit = 0;     // Desabilita interrupcao do Timer1
+                    atualiza_tela = 1;
+                }
+            }
+        }
+    }
+}
+
+void Atualiza_Display() {
+
+    Lcd_Cmd(_LCD_CLEAR);
+    Delay_ms(2);
+
+    if (modo_contagem == 0) {
+        Lcd_Out(1, 2, "Selecione");
+        Lcd_Out(2, 2, "D0:60 D1:10");
+    }
+
+    if (modo_contagem == 1) {
+        Lcd_Out(1, 2, "Modo: Longo");
+        Lcd_Out(2, 2, "Tempo: ");
+
+        Lcd_Chr(2, 9,  (tempo_restante / 10) + 48);
+        Lcd_Chr(2, 10, (tempo_restante % 10) + 48);
+        Lcd_Chr(2, 11, 's');
+
+        Lcd_Out(2, 12, "    ");
+    }
+
+    if (modo_contagem == 2) {
+        Lcd_Out(1, 2, "Modo: Curto");
+        Lcd_Out(2, 2, "Tempo: ");
+
+        Lcd_Chr(2, 9,  (tempo_restante / 10) + 48);
+        Lcd_Chr(2, 10, (tempo_restante % 10) + 48);
+        Lcd_Chr(2, 11, 's');
+
+        Lcd_Out(2, 12, "    ");
+    }
+}
+
+void Inicia_Contagem_Longa() {
+
+    modo_contagem = 1;
+    tempo_restante = 60;
+    contagem_ativa = 1;
+    ticks_250ms = 0;
+    atualiza_tela = 1;
+
+    TMR1IE_bit = 0;
+
+    Carrega_Timer0();
+    TMR0IF_bit = 0;
+    TMR0IE_bit = 1;
+}
+
+void Inicia_Contagem_Curta() {
+
+    modo_contagem = 2;
+    tempo_restante = 10;
+    contagem_ativa = 1;
+    ticks_250ms = 0;
+    atualiza_tela = 1;
+
+    TMR0IE_bit = 0;
+
+    Carrega_Timer1();
+    TMR1IF_bit = 0;
+    TMR1IE_bit = 1;
+}
+
+void main() {
+
+    ADCON1 = 0x0F;       // Configura os pinos como digitais
+    CMCON = 0x07;        // Desabilita os comparadores internos
+
+    TRISD0_bit = 1;      // RD0 como entrada: contagem longa
+    TRISD1_bit = 1;      // RD1 como entrada: contagem curta
+
+    Lcd_Init();
+    Lcd_Cmd(_LCD_CLEAR);
+    Lcd_Cmd(_LCD_CURSOR_OFF);
+    Delay_ms(100);
+
+    T0CON = 0x87;
+    Carrega_Timer0();
+    TMR0IF_bit = 0;
+    TMR0IE_bit = 0;      // Comeca desligado
+
+    T1CON = 0xB1;
+    Carrega_Timer1();
+    TMR1IF_bit = 0;
+    TMR1IE_bit = 0;      // Comeca desligado
+
+    PEIE_bit = 1;        // Habilita interrupcoes de perifericos
+    GIE_bit = 1;         // Habilita interrupcoes globais
+
+    atualiza_tela = 1;
+
+    while(1) {
+        if (PORTD.RD0 == 1) {
+            if (flag_botao_longo == 0) {
+                Delay_ms(50);        // Debounce simples
+
+                if (PORTD.RD0 == 1) {
+                    flag_botao_longo = 1;
+                    Inicia_Contagem_Longa();
+                }
+            }
+        } else {
+            flag_botao_longo = 0;
+        }
+
+        if (PORTD.RD1 == 1) {
+            if (flag_botao_curto == 0) {
+                Delay_ms(50);
+
+                if (PORTD.RD1 == 1) {
+                    flag_botao_curto = 1;
+                    Inicia_Contagem_Curta();
+                }
+            }
+        } else {
+            flag_botao_curto = 0;
+        }
+
+        if (atualiza_tela == 1) {
+            Atualiza_Display();
+            atualiza_tela = 0;
+        }
+    }
+}
+```
 
 ### 4.3 Conversão A/D, Matemática e Histerese
 A integração final adicionou a leitura do sensor de temperatura. O compilador MikroC possui uma peculiaridade na função ADC_Init(), que sobrescreve a configuração de referência de tensão para os padrões do chip. Para contornar isso e assegurar que a leitura utilizasse o limite estrito de 1V no pino AN3, o registrador ADCON1 foi manipulado manualmente logo após a chamada da biblioteca. Por fim, o valor bruto foi convertido matematicamente sem o uso de variáveis de ponto flutuante, e o sistema de aquecimento (LED) foi programado com uma lógica de histerese (ligar < 60°C; desligar > 80°C) para evitar oscilações indesejadas no controle do forno.
 
-[INSERIR BLOCO DE CÓDIGO AQUI: Trecho da função main() mostrando a reconfiguração manual do ADCON1 = 0b00011110 e todo o bloco interno do while(1) contendo o cálculo da temperatura_bruta, a formatação e o if/else do LED]
+```c
+sbit LCD_RS at LATB4_bit;
+sbit LCD_EN at LATB5_bit;
+sbit LCD_D4 at LATB0_bit;
+sbit LCD_D5 at LATB1_bit;
+sbit LCD_D6 at LATB2_bit;
+sbit LCD_D7 at LATB3_bit;
+
+sbit LCD_RS_Direction at TRISB4_bit;
+sbit LCD_EN_Direction at TRISB5_bit;
+sbit LCD_D4_Direction at TRISB0_bit;
+sbit LCD_D5_Direction at TRISB1_bit;
+sbit LCD_D6_Direction at TRISB2_bit;
+sbit LCD_D7_Direction at TRISB3_bit;
+
+sbit LED_FORNO at LATD6_bit;
+sbit LED_FORNO_Direction at TRISD6_bit;
+
+#define TMR0H_PRELOAD 0xE1
+#define TMR0L_PRELOAD 0x7B
+
+#define TMR1H_PRELOAD 0x0B
+#define TMR1L_PRELOAD 0xDC
+
+volatile unsigned char tempo_restante = 0;
+volatile unsigned char modo_contagem = 0;      // 0 = parado, 1 = longo, 2 = curto
+volatile unsigned char contagem_ativa = 0;
+volatile unsigned char ticks_250ms = 0;
+
+unsigned char flag_botao_longo = 0;
+unsigned char flag_botao_curto = 0;
+
+unsigned int leitura_adc = 0;
+unsigned int temperatura_x10 = 0;              // Temperatura multiplicada por 10
+
+void Carrega_Timer0() {
+    TMR0H = TMR0H_PRELOAD;
+    TMR0L = TMR0L_PRELOAD;
+}
+
+void Carrega_Timer1() {
+    TMR1H = TMR1H_PRELOAD;
+    TMR1L = TMR1L_PRELOAD;
+}
+
+void Configura_ADC() {
+
+    // ADCON1 = 0x0E = 00001110
+    // VCFG1 = 0 -> VREF- = VSS
+    // VCFG0 = 0 -> VREF+ = VDD
+    // PCFG = 1110 -> AN0 analogico e demais pinos digitais
+    ADCON1 = 0x0E;
+
+    // ADCON2 = 0xBD = 10111101
+    // ADFM = 1 -> resultado justificado a direita
+    // ACQT = 111 -> tempo de aquisicao 20 TAD
+    // ADCS = 101 -> clock do ADC Fosc/16
+    ADCON2 = 0xBD;
+
+    // ADCON0 = 0x01
+    // CHS = 0000 -> canal AN0
+    // ADON = 1 -> ADC ligado
+    ADCON0 = 0x01;
+}
+
+unsigned int Le_ADC_AN0() {
+    unsigned int resultado;
+    unsigned int timeout;
+
+    Configura_ADC();
+    Delay_us(80);
+
+    // Inicia conversao
+    GO_DONE_bit = 1;
+
+    timeout = 60000;
+    while ((GO_DONE_bit == 1) && (timeout > 0)) {
+        timeout--;
+    }
+
+    // Se der algum problema, retorna zero sem travar o PIC
+    if (timeout == 0) {
+        return 0;
+    }
+
+    // Resultado de 10 bits em ADRESH:ADRESL
+    resultado = ((unsigned int)ADRESH << 8) + ADRESL;
+
+    return resultado;
+}
+
+void Atualiza_Temperatura() {
+
+    leitura_adc = Le_ADC_AN0();
+
+    // Conversao para decimos de grau Celsius.
+    // Como o potenciometro esta limitado entre 0 e 1 V:
+    // 0 V -> 0,0 C
+    // 1 V -> 100,0 C
+    temperatura_x10 = ((unsigned long)leitura_adc * 5000 + 511) / 1023;
+
+    if (temperatura_x10 > 1000) {
+        temperatura_x10 = 1000;
+    }
+
+    if (temperatura_x10 > 500) {
+        LED_FORNO = 1;
+    } else {
+        LED_FORNO = 0;
+    }
+}
+
+void interrupt() {
+
+    // Timer0: contagem longa, base de aproximadamente 1 segundo
+    if (TMR0IF_bit == 1) {
+        TMR0IF_bit = 0;
+        Carrega_Timer0();
+
+        if ((modo_contagem == 1) && (contagem_ativa == 1)) {
+            if (tempo_restante > 0) {
+                tempo_restante--;
+            }
+
+            if (tempo_restante == 0) {
+                contagem_ativa = 0;
+                TMR0IE_bit = 0;
+            }
+        }
+    }
+
+    // Timer1: base de 250 ms para a contagem curta
+    if (TMR1IF_bit == 1) {
+        TMR1IF_bit = 0;
+        Carrega_Timer1();
+
+        if ((modo_contagem == 2) && (contagem_ativa == 1)) {
+            ticks_250ms++;
+
+            if (ticks_250ms >= 4) {
+                ticks_250ms = 0;
+
+                if (tempo_restante > 0) {
+                    tempo_restante--;
+                }
+
+                if (tempo_restante == 0) {
+                    contagem_ativa = 0;
+                    TMR1IE_bit = 0;
+                }
+            }
+        }
+    }
+}
+
+void Atualiza_Display() {
+
+    // Linha 1: temperatura
+    // Comeca com um espaco para evitar bug visual do SimulIDE
+    Lcd_Out(1, 1, " T=000.0C      ");
+
+    // Formato:
+    // temperatura_x10 = 41   -> T=004.1C
+    // temperatura_x10 = 523  -> T=052.3C
+    // temperatura_x10 = 753  -> T=075.3C
+    // temperatura_x10 = 1000 -> T=100.0C
+
+    Lcd_Chr(1, 4, (temperatura_x10 / 1000) + 48);
+    Lcd_Chr(1, 5, ((temperatura_x10 / 100) % 10) + 48);
+    Lcd_Chr(1, 6, ((temperatura_x10 / 10) % 10) + 48);
+    Lcd_Chr(1, 8, (temperatura_x10 % 10) + 48);
+
+    // Linha 2: estado da contagem
+    // Todas as mensagens tambem comecam com espaco.
+    // Assim, se o SimulIDE cortar o primeiro caractere, ele corta apenas o espaco.
+
+    if (contagem_ativa == 0) {
+        Lcd_Out(2, 1, " D0:60 D1:10   ");
+    } else {
+        if (modo_contagem == 1) {
+            Lcd_Out(2, 1, " LONGO: 00s    ");
+        } else {
+            Lcd_Out(2, 1, " CURTO: 00s    ");
+        }
+
+        // Como agora a string comeca na coluna 1 com espaco,
+        // os digitos do tempo ficam nas colunas 9 e 10.
+        Lcd_Chr(2, 9, (tempo_restante / 10) + 48);
+        Lcd_Chr(2, 10, (tempo_restante % 10) + 48);
+    }
+}
+
+void Inicia_Contagem_Longa() {
+
+    modo_contagem = 1;
+    tempo_restante = 60;
+    contagem_ativa = 1;
+    ticks_250ms = 0;
+
+    TMR1IE_bit = 0;
+
+    Carrega_Timer0();
+    TMR0IF_bit = 0;
+    TMR0IE_bit = 1;
+}
+
+void Inicia_Contagem_Curta() {
+
+    modo_contagem = 2;
+    tempo_restante = 10;
+    contagem_ativa = 1;
+    ticks_250ms = 0;
+
+    TMR0IE_bit = 0;
+
+    Carrega_Timer1();
+    TMR1IF_bit = 0;
+    TMR1IE_bit = 1;
+}
+
+void main() {
+
+    // Desabilita comparadores internos
+    CMCON = 0x07;
+
+    // Botoes com pull-down externo
+    TRISD0_bit = 1;       // RD0: inicia contagem longa
+    TRISD1_bit = 1;       // RD1: inicia contagem curta
+
+    LED_FORNO_Direction = 0;
+    LED_FORNO = 0;
+
+    // AN0 como entrada analogica
+    TRISA0_bit = 1;
+
+    // Configura ADC
+    Configura_ADC();
+
+    // Inicializacao do LCD
+    Lcd_Init();
+    Lcd_Cmd(_LCD_CLEAR);
+    Lcd_Cmd(_LCD_CURSOR_OFF);
+    Delay_ms(100);
+
+    // Configuracao Timer0
+    T0CON = 0x87;
+    Carrega_Timer0();
+    TMR0IF_bit = 0;
+    TMR0IE_bit = 0;
+
+    // Configuracao Timer1
+    T1CON = 0xB1;
+    Carrega_Timer1();
+    TMR1IF_bit = 0;
+    TMR1IE_bit = 0;
+
+    // Habilita interrupcoes
+    PEIE_bit = 1;
+    GIE_bit = 1;
+
+    while(1) {
+
+        // Le temperatura continuamente
+        Atualiza_Temperatura();
+
+        // Botao RD0: inicia contagem longa
+        if (PORTD.RD0 == 1) {
+            if (flag_botao_longo == 0) {
+                flag_botao_longo = 1;
+                Inicia_Contagem_Longa();
+                Delay_ms(80);
+            }
+        } else {
+            flag_botao_longo = 0;
+        }
+
+        // Botao RD1: inicia contagem curta
+        if (PORTD.RD1 == 1) {
+            if (flag_botao_curto == 0) {
+                flag_botao_curto = 1;
+                Inicia_Contagem_Curta();
+                Delay_ms(80);
+            }
+        } else {
+            flag_botao_curto = 0;
+        }
+
+        Atualiza_Display();
+
+        Delay_ms(40);
+    }
+}
+```
 
 ---
 
-## 5 Código Fonte Completo
-Este é o firmware final integrado desenvolvido para o projeto em linguagem C:
-
-[INSERIR BLOCO DE CÓDIGO AQUI: Código fonte completo (.c) em MikroC]
-
----
-
-## 6 Guia de Simulação e Testes
+## 5 Guia de Simulação e Testes
 Para validar a solução de hardware e software apresentada, o circuito foi esquematizado e testado no SimulIDE. Os resultados da execução e a resposta do sistema aos comandos analógicos e digitais podem ser observados nas figuras abaixo.
-
-
 
 <p align="center">
   <img src="https://github.com/user-attachments/assets/c127f249-194e-43a6-9d30-02dfd5841d02" height="400">
@@ -173,10 +666,42 @@ Para validar a solução de hardware e software apresentada, o circuito foi esqu
   <em>Figura 1: Simulação do Checkpoint 1 no SimulIDE. O sistema inicializa o display LCD HD44780 no modo de 4 bits, exibindo a string estática "HelloWrld". O circuito de pull-down (10 kΩ) no pino RD0 garante a leitura precisa da borda de subida, refletindo a contagem tratada via debounce no display.</em>
 </p>
 
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/5d484578-9ea6-4465-b3a7-ebb2cb72e37b" height="400">
+</p>
+
+<p align="center">
+  <em>Figura 2: Simulação do Checkpoint 2. O sistema executando a contagem regressiva de curta duração (10s) após o acionamento do Botão 2 (INT1).</em>
+</p>
+
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/c6a393ee-f7cd-465b-a380-fe8fb7130cf1" height="400">
+</p>
+
+<p align="center">
+  <em>Figura 2: Simulação do Checkpoint 2. A contagem de longa duração (60s) disparada pelo Botão 1 (INT0). A temporização é gerenciada autonomamente pelo hardware interno (Timer0) do PIC18F4550.</em>
+</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 ---
 
-## 7 Conclusão
+## 6 Conclusão
 A conclusão deste projeto evidencia o sucesso na implementação de um firmware robusto para a aferição térmica e temporal de um forno industrial, utilizando a arquitetura avançada do microcontrolador PIC18F4550. Através da metodologia de Aprendizagem Baseada em Problemas (PBL), o desenvolvimento ocorreu de forma evolutiva: partindo do tratamento de repique mecânico (bouncing) e interface com displays alfanuméricos nos primeiros checkpoints, até culminar na gestão complexa de periféricos internos mistos nesta entrega final.
 
 O principal marco técnico deste projeto em relação a estudos anteriores (como o 8051) foi a transição para a linguagem C, que permitiu abstrair a complexidade do mapeamento de hardware em baixo nível, garantindo um código mais modular e de fácil manutenção. A arquitetura orientada a eventos (Event-Driven) foi amplamente explorada. A utilização das interrupções externas (INT0 e INT1) aliadas ao estouro autônomo do Timer0 libertou a Unidade Lógica e Aritmética de ciclos de espera ociosos (polling ou delays travados). Isso permitiu que o loop principal se dedicasse exclusivamente à tarefa mais custosa: a amostragem contínua do Conversor Analógico-Digital e a atualização gráfica.
@@ -187,7 +712,7 @@ Por fim, a integração da lógica de histerese no controle do elemento de aquec
 
 ---
 
-## 8 Referências
+## 7 Referências
 
 1. OLIVEIRA, Pedro. Slides, Apostilas e Notas de Aula da Disciplina SEL0433 - Aplicação de Microprocessadores. Escola de Engenharia de São Carlos (EESC-USP). [Principal Referência Teórica e Técnica].
 2. MICROCHIP TECHNOLOGY INC. PIC18F2455/2550/4455/4550 Data Sheet. Documentação oficial do microcontrolador. Disponível em: https://www.microchip.com/.
