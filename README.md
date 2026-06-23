@@ -44,7 +44,7 @@ De acordo com o roteiro do projeto, o sistema deve cumprir integralmente os segu
 
 4. **Acionamento Reativo**: Seleção do tempo de aferição e início do processo por meio de botões com tratamento de bouncing e detecção de borda de subida via interrupções externas (INT0 / INT1).
 
-5. **Controle de Histerese (Resistência)**: Um LED deve sinalizar o estado da resistência do forno, acendendo em temperaturas inferiores a 60°C e apagando ao ultrapassar 80°C.
+5. **Controle de Histerese (Resistência)**: Um LED deve sinalizar o estado da resistência do forno, acendendo para temperaturas maiores que 50°C.
 
 ---
 
@@ -357,7 +357,7 @@ void main() {
 ```
 
 ### 4.3 Conversão A/D, Matemática e Histerese
-A integração final adicionou a leitura do sensor de temperatura. O compilador MikroC possui uma peculiaridade na função ADC_Init(), que sobrescreve a configuração de referência de tensão para os padrões do chip. Para contornar isso e assegurar que a leitura utilizasse o limite estrito de 1V no pino AN3, o registrador ADCON1 foi manipulado manualmente logo após a chamada da biblioteca. Por fim, o valor bruto foi convertido matematicamente sem o uso de variáveis de ponto flutuante, e o sistema de aquecimento (LED) foi programado com uma lógica de histerese (ligar < 60°C; desligar > 80°C) para evitar oscilações indesejadas no controle do forno.
+A integração final adicionou a leitura do sensor de temperatura. O compilador MikroC possui uma peculiaridade na função ADC_Init(), que sobrescreve a configuração de referência de tensão para os padrões do chip. Para contornar isso e assegurar que a leitura utilizasse o limite estrito de 1V no pino AN3, o registrador ADCON1 foi manipulado manualmente logo após a chamada da biblioteca. Por fim, o valor bruto foi convertido matematicamente sem o uso de variáveis de ponto flutuante, e o sistema de aquecimento (LED) foi programado com uma lógica de histerese (ligar >= 50°C) para evitar oscilações indesejadas no controle do forno.
 
 ```c
 sbit LCD_RS at LATB4_bit;
@@ -695,7 +695,7 @@ Para validar a solução de hardware e software apresentada, o circuito foi esqu
 </p>
 
 <p align="center">
-  <em>Figura 5: Simulação integrada da Entrega Final no SimulIDE (Modo Curto). O potenciômetro conectado ao conversor A/D emula o sinal do sensor LM35, que é calculado e formatado para 21.5 °C no display LCD. Como a temperatura medida é inferior ao limite inferior de histerese estabelecido (60 °C), o microcontrolador aciona corretamente o LED conectado à porta digital, indicando que a resistência do forno está ligada durante a aferição de tempo.</em>
+  <em>Figura 5: Simulação integrada da Entrega Final no SimulIDE (Modo Curto). O potenciômetro conectado ao conversor A/D emula o sinal do sensor LM35, que é calculado e formatado para 21.5 °C no display LCD. Como a temperatura medida é inferior ao limite inferior de histerese estabelecido (50 °C), o microcontrolador aciona corretamente o LED conectado à porta digital, indicando que a resistência do forno está ligada durante a aferição de tempo.</em>
 </p>
 
 <p align="center">
@@ -703,7 +703,7 @@ Para validar a solução de hardware e software apresentada, o circuito foi esqu
 </p>
 
 <p align="center">
-  <em>Figura 6: Simulação integrada da Entrega Final no SimulIDE (Modo Longo). O sistema agora executa a base de tempo de longa duração (60s), acionada pelo Botão 1 (INT0). A leitura de temperatura do ADC permanece em 21.5 °C, mantendo o LED da resistência acionado (nível lógico alto em RD1), visto que o valor continua abaixo do limite inferior de 60 °C estipulado nos requisitos do projeto.</em>
+  <em>Figura 6: Simulação integrada da Entrega Final no SimulIDE (Modo Longo). O sistema agora executa a base de tempo de longa duração (60s), acionada pelo Botão 1 (INT0). A leitura de temperatura do ADC permanece em 21.5 °C, mantendo o LED da resistência acionado (nível lógico alto em RD1), visto que o valor continua abaixo do limite inferior de 50 °C estipulado nos requisitos do projeto.</em>
 </p>
 
 <p align="center">
@@ -711,7 +711,7 @@ Para validar a solução de hardware e software apresentada, o circuito foi esqu
 </p>
 
 <p align="center">
-  <em>Figura 7: Simulação do Modo Curto com temperatura em ascensão. O sinal analógico foi ajustado para 543.0 mV, resultando na exibição exata de 54.3 °C no display LCD. Como este valor ainda encontra-se abaixo da margem inferior de 60 °C exigida pelos requisitos do projeto, o microcontrolador mantém o controle da resistência (LED) em nível lógico alto para que o forno continue aquecendo.</em>
+  <em>Figura 7: Simulação do Modo Curto com temperatura em ascensão. O sinal analógico foi ajustado para 543.0 mV, resultando na exibição exata de 54.3 °C no display LCD. Como este valor ainda encontra-se abaixo da margem inferior de 50 °C exigida pelos requisitos do projeto, o microcontrolador mantém o controle da resistência (LED) em nível lógico alto para que o forno continue aquecendo.</em>
 </p>
 
 <p align="center">
@@ -719,7 +719,7 @@ Para validar a solução de hardware e software apresentada, o circuito foi esqu
 </p>
 
 <p align="center">
-  <em>Figura 8: Simulação integrada da Entrega Final (Modo Longo). O temporizador gerencia a contagem regressiva de longa duração de forma autônoma, exibindo 54s restantes. Simultaneamente, o módulo A/D realiza a conversão precisa de 543.0 mV para 54.3 °C. O microcontrolador mantém a resistência (LED) ativada, validando que o sistema de histerese opera de forma independente e correta em qualquer um dos modos de temporização, já que a temperatura ainda não atingiu a margem de 60 °C.</em>
+  <em>Figura 8: Simulação integrada da Entrega Final (Modo Longo). O temporizador gerencia a contagem regressiva de longa duração de forma autônoma, exibindo 54s restantes. Simultaneamente, o módulo A/D realiza a conversão precisa de 543.0 mV para 54.3 °C. O microcontrolador mantém a resistência (LED) ativada, validando que o sistema de histerese opera de forma independente e correta em qualquer um dos modos de temporização, já que a temperatura ainda não atingiu a margem de 50 °C.</em>
 </p>
 
 ---
