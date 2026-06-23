@@ -679,25 +679,48 @@ Para validar a solução de hardware e software apresentada, o circuito foi esqu
 </p>
 
 <p align="center">
-  <em>Figura 2: Simulação do Checkpoint 2. A contagem de longa duração (60s) disparada pelo Botão 1 (INT0). A temporização é gerenciada autonomamente pelo hardware interno (Timer0) do PIC18F4550.</em>
+  <em>Figura 3: Simulação do Checkpoint 2. A contagem de longa duração (60s) disparada pelo Botão 1 (INT0). A temporização é gerenciada autonomamente pelo hardware interno (Timer0) do PIC18F4550.</em>
 </p>
 
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/a4680747-ee8f-4d93-b9f8-8e4d141bc09b" height="400">
+</p>
 
+<p align="center">
+  <em>Figura 4: Ambiente de desenvolvimento MikroC PRO for PIC utilizado na Entrega Final. Em destaque no painel lateral direito, o gerenciador (Library Manager) com as bibliotecas <code>ADC</code> e <code>Lcd</code> habilitadas, requisito essencial para a operação do conversor analógico-digital e interface visual. Na parte inferior, o log de mensagens confirma a compilação bem-sucedida do firmware completo.</em>
+</p>
 
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/9fcf0d1f-865a-44b9-b082-502e971b1551" height="400">
+</p>
 
+<p align="center">
+  <em>Figura 5: Simulação integrada da Entrega Final no SimulIDE (Modo Curto). O potenciômetro conectado ao conversor A/D emula o sinal do sensor LM35, que é calculado e formatado para 21.5 °C no display LCD. Como a temperatura medida é inferior ao limite inferior de histerese estabelecido (60 °C), o microcontrolador aciona corretamente o LED conectado à porta digital, indicando que a resistência do forno está ligada durante a aferição de tempo.</em>
+</p>
 
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/bf88e8ec-8335-4528-9bbd-2f579d3cd607" height="400">
+</p>
 
+<p align="center">
+  <em>Figura 6: Simulação integrada da Entrega Final no SimulIDE (Modo Longo). O sistema agora executa a base de tempo de longa duração (60s), acionada pelo Botão 1 (INT0). A leitura de temperatura do ADC permanece em 21.5 °C, mantendo o LED da resistência acionado (nível lógico alto em RD1), visto que o valor continua abaixo do limite inferior de 60 °C estipulado nos requisitos do projeto.</em>
+</p>
 
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/b6c6a42b-9723-4b0d-ba9a-0644642b7f8c" height="400">
+</p>
 
+<p align="center">
+  <em>Figura 7: Simulação do Modo Curto com temperatura em ascensão. O sinal analógico foi ajustado para 543.0 mV, resultando na exibição exata de 54.3 °C no display LCD. Como este valor ainda encontra-se abaixo da margem inferior de 60 °C exigida pelos requisitos do projeto, o microcontrolador mantém o controle da resistência (LED) em nível lógico alto para que o forno continue aquecendo.</em>
+</p>
 
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/f582cb60-f3c6-4130-a1b3-d2da6d87767c" height="400">
+</p>
 
-
-
-
-
-
-
-
+<p align="center">
+  <em>Figura 8: Simulação integrada da Entrega Final (Modo Longo). O temporizador gerencia a contagem regressiva de longa duração de forma autônoma, exibindo 54s restantes. Simultaneamente, o módulo A/D realiza a conversão precisa de 543.0 mV para 54.3 °C. O microcontrolador mantém a resistência (LED) ativada, validando que o sistema de histerese opera de forma independente e correta em qualquer um dos modos de temporização, já que a temperatura ainda não atingiu a margem de 60 °C.</em>
+</p>
 
 ---
 
